@@ -2,7 +2,6 @@ namespace CopyBlob;
 
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Azure.Storage.Blobs.Specialized;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -54,39 +53,30 @@ public static class CopyBlobFunction
                 throw new Exception($"Source Blob {new Uri(parameters.SourceBlobUrl).AbsoluteUri} does not exist.");
             }
 
-            BlobLeaseClient lease = sourceBlob.GetBlobLeaseClient();
-            _ = await lease.AcquireAsync(TimeSpan.FromSeconds(-1));
-            try
+            sourceBlobInfo = await sourceBlob.GetPropertiesAsync();
+            log.LogInformation($"Source Blob information : {sourceBlobInfo}");
+
+            CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(sourceBlob.Uri);
+
+            do
             {
-                sourceBlobInfo = await sourceBlob.GetPropertiesAsync();
-                log.LogInformation($"Source Blob information : {sourceBlobInfo}");
+                destinationBlobInfo = (await destinationBlob.GetPropertiesAsync()).Value;
+                log.LogInformation($"Copy Blob information : {destinationBlobInfo}");
 
-                CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(sourceBlob.Uri);
-
-                do
+                if (destinationBlobInfo.BlobCopyStatus == CopyStatus.Pending)
                 {
-                    destinationBlobInfo = (await destinationBlob.GetPropertiesAsync()).Value;
-                    log.LogInformation($"Copy Blob information : {destinationBlobInfo}");
-
-                    if (destinationBlobInfo.BlobCopyStatus == CopyStatus.Pending)
+                    if (++retry > 200)
                     {
-                        if (++retry > 200)
-                        {
-                            throw new Exception($"The copy is still pending after {retry} seconds.");
-                        }
-                        await Task.Delay(1000);
+                        throw new Exception($"The copy is still pending after {retry} seconds.");
                     }
-                    else
-                    {
-                        break;
-                    }
+                    await Task.Delay(1000);
                 }
-                while (true);
+                else
+                {
+                    break;
+                }
             }
-            finally
-            {
-                _ = await lease.BreakAsync();
-            }
+            while (true);
         }
         catch (Exception e)
         {
