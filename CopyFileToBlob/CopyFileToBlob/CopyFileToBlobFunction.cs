@@ -47,7 +47,6 @@ public static class CopyBlobFunction
             CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(new Uri(parameters.SourceBlobUrl));
 
             _ = await operation.WaitForCompletionAsync();
-            await Task.Delay(1000);
         }
         catch (Exception e)
         {
@@ -55,6 +54,7 @@ public static class CopyBlobFunction
             return new BadRequestObjectResult(e);
         }
         string message = $"Blob Copy successful.\n{parameters}";
+        await Task.Delay(1000);
         log.LogInformation(message);
         return new OkObjectResult(message);
     }
