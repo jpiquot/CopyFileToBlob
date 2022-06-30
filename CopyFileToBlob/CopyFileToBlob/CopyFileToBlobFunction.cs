@@ -2,6 +2,7 @@ namespace CopyBlob;
 
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +24,8 @@ public static class CopyBlobFunction
         ILogger log)
     {
         CopyParameters parameters = new();
-        BlobProperties blobInfo = null;
+        BlobProperties destinationBlobInfo = null;
+        BlobProperties sourceBlobInfo = null;
         int retry = 0;
         try
         {
@@ -44,40 +46,58 @@ public static class CopyBlobFunction
             }
             log.LogInformation($"Blob copy started.\n{parameters}");
 
+            BlobClient sourceBlob = new(new Uri(parameters.SourceBlobUrl));
             BlobClient destinationBlob = new(new Uri(parameters.DestinationBlobUrl));
 
-            CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(new Uri(parameters.SourceBlobUrl));
-
-            var result = await operation.WaitForCompletionAsync();
-
-            if (result.Value != 0)
+            if (!await sourceBlob.ExistsAsync())
             {
-                throw new Exception($"Copy failed with error code : {result.Value} {result.Value:X8}");
+                throw new Exception($"Source Blob {new Uri(parameters.SourceBlobUrl).AbsolutePath} does not exist.");
             }
-            do
+            if (!await destinationBlob.ExistsAsync())
             {
-                blobInfo = (await destinationBlob.GetPropertiesAsync()).Value;
-                if (blobInfo.BlobCopyStatus == CopyStatus.Pending)
+                throw new Exception($"Destination Blob {new Uri(parameters.DestinationBlobUrl).AbsolutePath} does not exist.");
+            }
+
+            BlobLeaseClient lease = sourceBlob.GetBlobLeaseClient();
+            _ = await lease.AcquireAsync(TimeSpan.FromSeconds(-1));
+            try
+            {
+                sourceBlobInfo = await sourceBlob.GetPropertiesAsync();
+                log.LogInformation($"Source Blob information : {sourceBlobInfo}");
+
+                CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(sourceBlob.Uri);
+
+                do
                 {
-                    if (++retry > 10)
+                    destinationBlobInfo = (await destinationBlob.GetPropertiesAsync()).Value;
+                    log.LogInformation($"Copy Blob information : {destinationBlobInfo}");
+
+                    if (destinationBlobInfo.BlobCopyStatus == CopyStatus.Pending)
                     {
-                        throw new Exception($"The copy is still pending after {retry} seconds.");
+                        if (++retry > 200)
+                        {
+                            throw new Exception($"The copy is still pending after {retry} seconds.");
+                        }
+                        await Task.Delay(1000);
                     }
-                    await Task.Delay(1000);
+                    else
+                    {
+                        break;
+                    }
                 }
-                else
-                {
-                    break;
-                }
+                while (true);
             }
-            while (true);
+            finally
+            {
+                _ = await lease.BreakAsync();
+            }
         }
         catch (Exception e)
         {
-            log.LogError(e, $"Blob Copy failed.\n{parameters}\n{blobInfo}");
+            log.LogError(e, $"Blob Copy failed.\n{parameters}\n{sourceBlobInfo}\n{destinationBlobInfo}");
             return new BadRequestObjectResult(e);
         }
-        string message = $"Blob Copy successful.\n{parameters}\n{blobInfo}";
+        string message = $"Blob Copy successful.\n{parameters}\n{sourceBlobInfo}\n{destinationBlobInfo}";
         log.LogInformation(message);
         return new OkObjectResult(message);
     }
