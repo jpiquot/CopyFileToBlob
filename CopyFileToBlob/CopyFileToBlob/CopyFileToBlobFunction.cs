@@ -1,4 +1,4 @@
-namespace CopyFileToBlob;
+namespace CopyBlob;
 
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -18,15 +18,14 @@ public static class CopyBlobFunction
     [ActionName("Copy")]
     public static async Task<IActionResult> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post", Route = "CopyBlob")] HttpRequest req,
-        Uri sourceBlobUrl,
-        Uri destinatioBlobUrl,
+        CopyParameters parameters,
         ILogger log)
     {
         log.LogInformation($"Blob copy started.");
 
-        BlobClient destinationBlob = new(destinatioBlobUrl);
+        BlobClient destinationBlob = new(new Uri(parameters.DestinationBlobUrl));
 
-        CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(sourceBlobUrl);
+        CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(new Uri(parameters.SourceBlobUrl));
 
         _ = await operation.WaitForCompletionAsync();
 
