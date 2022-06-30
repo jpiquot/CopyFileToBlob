@@ -51,11 +51,7 @@ public static class CopyBlobFunction
 
             if (!await sourceBlob.ExistsAsync())
             {
-                throw new Exception($"Source Blob {new Uri(parameters.SourceBlobUrl).AbsolutePath} does not exist.");
-            }
-            if (!await destinationBlob.ExistsAsync())
-            {
-                throw new Exception($"Destination Blob {new Uri(parameters.DestinationBlobUrl).AbsolutePath} does not exist.");
+                throw new Exception($"Source Blob {new Uri(parameters.SourceBlobUrl).AbsoluteUri} does not exist.");
             }
 
             BlobLeaseClient lease = sourceBlob.GetBlobLeaseClient();
