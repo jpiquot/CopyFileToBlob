@@ -23,10 +23,12 @@ public static class CopyBlobFunction
         ILogger log)
     {
         CopyParameters parameters = new();
+        BlobProperties blobInfo = null;
+        int retry = 0;
         try
         {
             string requestBody = String.Empty;
-            using (StreamReader streamReader = new StreamReader(req.Body))
+            using (StreamReader streamReader = new(req.Body))
             {
                 requestBody = await streamReader.ReadToEndAsync();
             }
@@ -46,15 +48,36 @@ public static class CopyBlobFunction
 
             CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(new Uri(parameters.SourceBlobUrl));
 
-            _ = await operation.WaitForCompletionAsync();
+            var result = await operation.WaitForCompletionAsync();
+
+            if (result.Value != 0)
+            {
+                throw new Exception($"Copy failed with error code : {result.Value} {result.Value:X8}");
+            }
+            do
+            {
+                blobInfo = (await destinationBlob.GetPropertiesAsync()).Value;
+                if (blobInfo.BlobCopyStatus == CopyStatus.Pending)
+                {
+                    if (++retry > 10)
+                    {
+                        throw new Exception($"The copy is still pending after {retry} seconds.");
+                    }
+                    await Task.Delay(1000);
+                }
+                else
+                {
+                    break;
+                }
+            }
+            while (true);
         }
         catch (Exception e)
         {
-            log.LogError(e, $"Blob Copy failed.\n{parameters}");
+            log.LogError(e, $"Blob Copy failed.\n{parameters}\n{blobInfo}");
             return new BadRequestObjectResult(e);
         }
-        string message = $"Blob Copy successful.\n{parameters}";
-        await Task.Delay(1000);
+        string message = $"Blob Copy successful.\n{parameters}\n{blobInfo}";
         log.LogInformation(message);
         return new OkObjectResult(message);
     }
