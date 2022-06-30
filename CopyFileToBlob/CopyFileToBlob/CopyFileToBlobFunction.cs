@@ -54,14 +54,14 @@ public static class CopyBlobFunction
             }
 
             sourceBlobInfo = await sourceBlob.GetPropertiesAsync();
-            log.LogInformation($"Source Blob information : {sourceBlobInfo}");
+            log.LogInformation($"Source Blob information : {JsonConvert.SerializeObject(sourceBlobInfo)}");
 
             CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(sourceBlob.Uri);
 
             do
             {
                 destinationBlobInfo = (await destinationBlob.GetPropertiesAsync()).Value;
-                log.LogInformation($"Copy Blob information : {destinationBlobInfo}");
+                log.LogInformation($"Copy Blob information : {JsonConvert.SerializeObject(destinationBlobInfo)}");
 
                 if (destinationBlobInfo.BlobCopyStatus == CopyStatus.Pending)
                 {
@@ -80,10 +80,10 @@ public static class CopyBlobFunction
         }
         catch (Exception e)
         {
-            log.LogError(e, $"Blob Copy failed.\n{parameters}\n{sourceBlobInfo}\n{destinationBlobInfo}");
+            log.LogError(e, $"Blob Copy failed.\n{parameters}\n{JsonConvert.SerializeObject(sourceBlobInfo)}\n{JsonConvert.SerializeObject(destinationBlobInfo)}");
             return new BadRequestObjectResult(e);
         }
-        string message = $"Blob Copy successful.\n{parameters}\n{sourceBlobInfo}\n{destinationBlobInfo}";
+        string message = $"Blob Copy successful.\n{parameters}\n{JsonConvert.SerializeObject(sourceBlobInfo)}\n{JsonConvert.SerializeObject(destinationBlobInfo)}";
         log.LogInformation(message);
         return new OkObjectResult(message);
     }
