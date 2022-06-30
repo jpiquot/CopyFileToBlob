@@ -21,15 +21,30 @@ public static class CopyBlobFunction
         CopyParameters parameters,
         ILogger log)
     {
-        log.LogInformation($"Blob copy started.");
+        try
+        {
+            if (string.IsNullOrWhiteSpace(parameters.SourceBlobUrl))
+            {
+                throw new ArgumentNullException(nameof(parameters.SourceBlobUrl));
+            }
+            if (string.IsNullOrWhiteSpace(parameters.DestinationBlobUrl))
+            {
+                throw new ArgumentNullException(nameof(parameters.DestinationBlobUrl));
+            }
+            log.LogInformation($"Blob copy started.\n{parameters}");
 
-        BlobClient destinationBlob = new(new Uri(parameters.DestinationBlobUrl));
+            BlobClient destinationBlob = new(new Uri(parameters.DestinationBlobUrl));
 
-        CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(new Uri(parameters.SourceBlobUrl));
+            CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(new Uri(parameters.SourceBlobUrl));
 
-        _ = await operation.WaitForCompletionAsync();
-
-        string message = $"Blob Copy successful";
+            _ = await operation.WaitForCompletionAsync();
+        }
+        catch (Exception e)
+        {
+            log.LogError(e, $"Blob Copy failed.\n{parameters}");
+            return new BadRequestObjectResult(e);
+        }
+        string message = $"Blob Copy successful.\n{parameters}";
         log.LogInformation(message);
         return new OkObjectResult(message);
     }
