@@ -17,7 +17,7 @@ public static class CopyBlobFunction
     [FunctionName("CopyBlob")]
     [ActionName("Copy")]
     public static async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "CopyBlob")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
         CopyParameters parameters,
         ILogger log)
     {
