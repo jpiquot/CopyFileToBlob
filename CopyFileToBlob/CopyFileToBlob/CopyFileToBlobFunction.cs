@@ -34,11 +34,11 @@ public static class CopyBlobFunction
 
             if (string.IsNullOrWhiteSpace(parameters.SourceBlobUrl))
             {
-                throw new ArgumentNullException(nameof(parameters.SourceBlobUrl));
+                throw new ArgumentException(nameof(parameters.SourceBlobUrl));
             }
             if (string.IsNullOrWhiteSpace(parameters.DestinationBlobUrl))
             {
-                throw new ArgumentNullException(nameof(parameters.DestinationBlobUrl));
+                throw new ArgumentException(nameof(parameters.DestinationBlobUrl));
             }
             log.LogInformation($"Blob copy started.\n{parameters}");
 
@@ -47,6 +47,7 @@ public static class CopyBlobFunction
             CopyFromUriOperation operation = await destinationBlob.StartCopyFromUriAsync(new Uri(parameters.SourceBlobUrl));
 
             _ = await operation.WaitForCompletionAsync();
+            await Task.Delay(1000);
         }
         catch (Exception e)
         {
