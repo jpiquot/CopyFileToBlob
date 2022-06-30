@@ -9,20 +9,29 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
+using Newtonsoft.Json;
+
 using System;
+using System.IO;
 using System.Threading.Tasks;
 
 public static class CopyBlobFunction
 {
     [FunctionName("CopyBlob")]
-    [ActionName("Copy")]
     public static async Task<IActionResult> Run(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = null)] HttpRequest req,
-        CopyParameters parameters,
+        [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
         ILogger log)
     {
+        CopyParameters parameters = new();
         try
         {
+            string requestBody = String.Empty;
+            using (StreamReader streamReader = new StreamReader(req.Body))
+            {
+                requestBody = await streamReader.ReadToEndAsync();
+            }
+            parameters = JsonConvert.DeserializeObject<CopyParameters>(requestBody);
+
             if (string.IsNullOrWhiteSpace(parameters.SourceBlobUrl))
             {
                 throw new ArgumentNullException(nameof(parameters.SourceBlobUrl));
